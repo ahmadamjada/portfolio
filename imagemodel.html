@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Model AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #ebf8ff;
+        }
+
+        .container {
+            max-width: 800px;
+            text-align: center;
+            padding: 2rem;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .heading {
+            background: linear-gradient(90deg, #4f46e5, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+
+        .content {
+            font-size: 1.125rem;
+            color: #555;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            background-color: #4f46e5;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 0.375rem;
+            margin: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #06b6d4;
+        }
+
+        #label-container div {
+            font-size: 1.125rem;
+            margin-top: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+
+        #webcam-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 1rem;
+        }
+
+        canvas {
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="heading text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-500 via-green-500 to-purple-500 text-transparent bg-clip-text mb-4">
+            Teachable Machine Image Model
+        </h1>
+        <p class="content text-base md:text-lg text-center max-w-xl mx-auto mb-6">
+            This model uses your webcam to recognize different objects in real-time. Click "Start" to begin and "Stop" to end the session.
+        </p>
+
+        <div>
+            <button class="btn" type="button" onclick="init()">Start</button>
+            <button class="btn" type="button" onclick="stop()">Stop</button>
+        </div>
+        <div id="webcam-container"></div>
+        <div id="label-container" class="flex flex-col items-center mt-4"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script type="text/javascript">
+        const URL = "https://teachablemachine.withgoogle.com/models/K4GsnzBaW/";
+
+        let model, webcam, labelContainer, maxPredictions, isRunning = false;
+
+        async function init() {
+            if (isRunning) return; // Prevent multiple instances
+            isRunning = true;
+
+            console.log("Loading model...");
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+                console.log("Model loaded successfully.");
+
+                const flip = true;
+                const isMobile = window.innerWidth <= 768;
+                const width = isMobile ? 160 : 200;
+                const height = isMobile ? 160 : 200;
+
+                console.log(`Setting up webcam with resolution: ${width}x${height}`);
+                webcam = new tmImage.Webcam(width, height, flip);
+                await webcam.setup();
+                await webcam.play();
+                window.requestAnimationFrame(loop);
+
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+                labelContainer.innerHTML = ""; // Clear previous labels
+                for (let i = 0; i < maxPredictions; i++) {
+                    labelContainer.appendChild(document.createElement("div"));
+                }
+            } catch (error) {
+                console.error("Error loading model or setting up webcam:", error);
+            }
+        }
+
+        async function loop() {
+            if (!isRunning) return;
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+        }
+
+        function stop() {
+            if (!isRunning) return;
+            console.log("Stopping webcam and cleaning up...");
+            isRunning = false;
+            webcam.stop();
+            if (webcam.canvas && webcam.canvas.parentNode) {
+                webcam.canvas.parentNode.removeChild(webcam.canvas);
+            }
+            labelContainer.innerHTML = ""; // Clear labels
+            console.log("Webcam stopped and canvas removed.");
+        }
+    </script>
+
+</body>
+
+</html>
